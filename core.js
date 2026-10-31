@@ -6,14 +6,19 @@ const label=v=>String(v??'').trim();
 function detectHeader(rows){
   const first=rows.findIndex(r=>r.some(v=>label(v)!==''));
   if(first<0)return 0;
-  const count=r=>r.filter(v=>label(v)!=='').length;
-  if(count(rows[first])>1)return first;
-  // Only skip a sparse title when the next nonempty row is a dense text header.
-  for(let i=first+1;i<Math.min(rows.length,first+6);i++){
-    const values=rows[i].map(label).filter(Boolean);
+  const sample=rows.slice(first,first+30);
+  const counts=sample.map(r=>r.map(label).filter(Boolean).length);
+  const width=Math.max(...counts);
+  // Structural rules only: skip sparse titles/notes, favor the first dense
+  // textual row. Never use a customer's names, filenames or business fields.
+  const isValue=v=>/^[-+]?\d/.test(v)||/^(true|false)$/i.test(v);
+  for(let j=0;j<sample.length;j++){
+    const values=sample[j].map(label).filter(Boolean);
     if(!values.length)continue;
-    if(values.length>=3&&values.length>=rows[i].length*.6&&values.every(v=>!/^[-+]?\d/.test(v)))return i;
-    break;
+    const numeric=values.filter(isValue).length;
+    // Do not advance past a plausible data row to hunt for a later header.
+    if(values.length>=Math.max(2,Math.ceil(width*.6))&&numeric>=Math.max(1,values.length*.4))return first;
+    if(values.length>=Math.max(2,Math.ceil(width*.6))&&numeric===0)return first+j;
   }
   return first;
 }
